@@ -1,8 +1,0 @@
-{
-  "/alerts/page": "app/alerts/page.js",
-  "/page": "app/page.js",
-  "/sensors/[id]/page": "app/sensors/[id]/page.js",
-  "/sensors/page": "app/sensors/page.js",
-  "/spaces/page": "app/spaces/page.js",
-  "/users/page": "app/users/page.js"
-}
