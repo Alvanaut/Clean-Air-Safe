@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with TimescaleDB extension
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: cleanairsafe_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cleanairsafe
+      POSTGRES_PASSWORD: your_secure_password_here
+      POSTGRES_DB: cleanairsafe_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-timescaledb.sql:/docker-entrypoint-initdb.d/init-timescaledb.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleanairsafe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: cleanairsafe_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cleanairsafe_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run start:dev
+
+volumes:
+  postgres_data:
+  redis_data:
