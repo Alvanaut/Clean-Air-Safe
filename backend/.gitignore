@@ -35,3 +35,7 @@ coverage/
 .cache/
 temp/
 tmp/
+
+# Test files with credentials
+backend/test-*.json
+backend/test-*.sh
