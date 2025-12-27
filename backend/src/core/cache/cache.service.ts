@@ -11,7 +11,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     this.client = new Redis({
       host: this.configService.get('REDIS_HOST') || 'localhost',
-      port: parseInt(this.configService.get('REDIS_PORT')) || 6379,
+      port: parseInt(this.configService.get('REDIS_PORT') || '6379'),
       password: this.configService.get('REDIS_PASSWORD') || undefined,
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);

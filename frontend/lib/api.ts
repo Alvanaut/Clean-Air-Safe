@@ -1,0 +1,135 @@
+import apiClient from './api-client';
+import {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  User,
+  Sensor,
+  Tenant,
+  CreateSensorRequest,
+  UpdateSensorRequest,
+  CreateUserRequest,
+  UpdateUserRequest,
+  CreateTenantRequest,
+  UpdateTenantRequest,
+  GetReadingsParams,
+  GetReadingsResponse,
+  SensorReading,
+} from '@/types';
+
+// Auth API
+export const authApi = {
+  login: async (data: LoginRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/login', data);
+    return response.data; // Auth endpoints return data directly
+  },
+
+  register: async (data: RegisterRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/register', data);
+    return response.data;
+  },
+
+  getMe: async (): Promise<User> => {
+    const response = await apiClient.get<{ success: boolean; data: User }>('/auth/me');
+    return response.data.data; // Unwrap backend response
+  },
+};
+
+// Sensors API
+export const sensorsApi = {
+  getAll: async (): Promise<Sensor[]> => {
+    const response = await apiClient.get<{ success: boolean; data: Sensor[] }>('/sensors');
+    return response.data.data;
+  },
+
+  getById: async (id: string): Promise<Sensor> => {
+    const response = await apiClient.get<{ success: boolean; data: Sensor }>(`/sensors/${id}`);
+    return response.data.data;
+  },
+
+  create: async (data: CreateSensorRequest): Promise<Sensor> => {
+    const response = await apiClient.post<{ success: boolean; data: Sensor }>('/sensors', data);
+    return response.data.data;
+  },
+
+  update: async (id: string, data: UpdateSensorRequest): Promise<Sensor> => {
+    const response = await apiClient.put<{ success: boolean; data: Sensor }>(`/sensors/${id}`, data);
+    return response.data.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/sensors/${id}`);
+  },
+
+  getByQR: async (qrCode: string): Promise<Sensor> => {
+    const response = await apiClient.get<{ success: boolean; data: Sensor }>(`/sensors/qr/${qrCode}`);
+    return response.data.data;
+  },
+
+  getReadings: async (sensorId: string, params?: GetReadingsParams): Promise<GetReadingsResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const response = await apiClient.get<GetReadingsResponse>(
+      `/sensors/${sensorId}/readings${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    );
+    return response.data;
+  },
+};
+
+// Users API
+export const usersApi = {
+  getAll: async (): Promise<User[]> => {
+    const response = await apiClient.get<{ success: boolean; data: User[] }>('/users');
+    return response.data.data;
+  },
+
+  getById: async (id: string): Promise<User> => {
+    const response = await apiClient.get<{ success: boolean; data: User }>(`/users/${id}`);
+    return response.data.data;
+  },
+
+  create: async (data: CreateUserRequest): Promise<User> => {
+    const response = await apiClient.post<{ success: boolean; data: User }>('/users', data);
+    return response.data.data;
+  },
+
+  update: async (id: string, data: UpdateUserRequest): Promise<User> => {
+    const response = await apiClient.put<{ success: boolean; data: User }>(`/users/${id}`, data);
+    return response.data.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/users/${id}`);
+  },
+};
+
+// Tenants API
+export const tenantsApi = {
+  getAll: async (): Promise<Tenant[]> => {
+    const response = await apiClient.get<{ success: boolean; data: Tenant[] }>('/tenants');
+    return response.data.data;
+  },
+
+  getById: async (id: string): Promise<Tenant> => {
+    const response = await apiClient.get<{ success: boolean; data: Tenant }>(`/tenants/${id}`);
+    return response.data.data;
+  },
+
+  create: async (data: CreateTenantRequest): Promise<Tenant> => {
+    const response = await apiClient.post<{ success: boolean; data: Tenant }>('/tenants', data);
+    return response.data.data;
+  },
+
+  update: async (id: string, data: UpdateTenantRequest): Promise<Tenant> => {
+    const response = await apiClient.put<{ success: boolean; data: Tenant }>(`/tenants/${id}`, data);
+    return response.data.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/tenants/${id}`);
+  },
+};
