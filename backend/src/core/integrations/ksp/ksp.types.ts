@@ -52,7 +52,10 @@ export interface KspRealtimeLog {
 }
 
 export interface KspRealtimeLogsResponse {
-  logs: KspRealtimeLog[];
+  logs?: KspRealtimeLog[]; // Old format (deprecated?)
+  realtimeLogs?: KspRealtimeLog[]; // New format
+  historicLogs?: any[]; // May be present but empty
+  eventLogs?: any[]; // May be present but empty
 }
 
 // Historic Logs
@@ -110,12 +113,12 @@ export interface KspGroupResponse {
   group: KspGroup;
 }
 
-// Tag References (based on your data)
+// Tag References (based on actual API data)
 export enum KspTagReference {
-  CO2 = 'DT_co2',
-  TEMPERATURE = 'DT_temperature',
-  HUMIDITY = 'DT_humidity',
-  SERIAL_NUMBER = 'DT_serial_number',
+  CO2 = 'p_CO2',
+  TEMPERATURE = 'p_temperature',
+  HUMIDITY = 'p_humidity',
+  SERIAL_NUMBER = 'sys_device_sn',
 }
 
 // Helper types for our use

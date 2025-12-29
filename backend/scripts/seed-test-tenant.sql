@@ -15,10 +15,10 @@ INSERT INTO tenants (
   updated_at
 ) VALUES (
   gen_random_uuid(),
-  'CleanAirSafe Test',
-  'CLEAN AIR SAFE',
-  'alexis.vanautgaerden1@gmail.com',
-  '3c419280-35a0-4c50-8922-3d461adaaf3a',  -- KSP Contract ID from API
+  'Test Tenant',
+  'Test Company',
+  'contact@example.com',
+  'REPLACE_WITH_YOUR_KSP_CONTRACT_ID',  -- Get this from your KSP account
   true,
   600,  -- 10 minutes in seconds
   1000,

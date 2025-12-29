@@ -59,35 +59,38 @@ export class KspTestController {
   }
 
   /**
-   * Test KSP integration - Get real-time logs for multiple devices
-   * GET /api/ksp-test/realtime?contractId=xxx&deviceIds=dev1,dev2
+   * Test KSP integration - Get real-time logs for a single device
+   * GET /api/ksp-test/realtime?contractId=xxx&deviceId=16
    */
   @Get('realtime')
   async getRealtimeLogs(
     @Query('contractId') contractId: string,
-    @Query('deviceIds') deviceIdsStr: string,
+    @Query('deviceId') deviceId: string,
   ) {
-    if (!contractId || !deviceIdsStr) {
+    if (!contractId || !deviceId) {
       return {
         success: false,
-        message: 'contractId and deviceIds query parameters are required',
+        message: 'contractId and deviceId query parameters are required',
       };
     }
 
-    const deviceIds = deviceIdsStr.split(',');
-
     try {
-      const logs = await this.kspService.getMultipleDevicesRealtimeLogs(
+      // Use GET endpoint for single device - try Digital Twin tags
+      const logs = await this.kspService.getDeviceRealtimeLogs(
         contractId,
-        deviceIds,
+        deviceId,
+        ['DT_co2', 'DT_temperature', 'DT_humidity', 'DT_serial_number'],
       );
 
-      // Parse logs
-      const parsedReadings = this.kspService.parseRealtimeLogs(logs.logs);
+      // Parse logs (pass full response to handle both old and new format)
+      const parsedReadings = this.kspService.parseRealtimeLogs(
+        logs.logs || [],
+        logs,
+      );
 
       return {
         success: true,
-        message: `✅ Got real-time data for ${parsedReadings.length} devices`,
+        message: `✅ Got real-time data for device ${deviceId}`,
         raw_logs: logs,
         parsed_readings: parsedReadings,
       };
@@ -96,6 +99,8 @@ export class KspTestController {
         success: false,
         message: '❌ Failed to get real-time logs',
         error: error.message,
+        error_response: error.response?.data,
+        error_status: error.response?.status,
       };
     }
   }

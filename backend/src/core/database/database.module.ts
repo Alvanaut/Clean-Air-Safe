@@ -18,6 +18,9 @@ import { ConfigService } from '@nestjs/config';
         logging: configService.get('NODE_ENV') === 'development',
         migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
         migrationsRun: true,
+        extra: {
+          options: '-c timezone=UTC',
+        },
       }),
     }),
   ],

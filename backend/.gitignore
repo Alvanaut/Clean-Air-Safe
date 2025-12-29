@@ -37,5 +37,5 @@ temp/
 tmp/
 
 # Test files with credentials
-backend/test-*.json
-backend/test-*.sh
+test-*.json
+test-*.sh

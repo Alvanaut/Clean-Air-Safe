@@ -209,8 +209,8 @@ export class KspSyncService {
   }
 
   /**
-   * Sync readings for a device using historic logs
-   * Since real-time logs endpoint is broken, we use historic logs for last 15 minutes
+   * Sync readings for a device using realtime logs
+   * Gets the current sensor readings and stores them in the database
    */
   private async syncDeviceReadings(
     tenant: Tenant,
@@ -220,36 +220,33 @@ export class KspSyncService {
       throw new Error('Tenant has no KSP contract ID');
     }
 
-    // Get historic logs for last 15 minutes
-    const endTime = new Date();
-    const startTime = new Date(endTime.getTime() - 15 * 60 * 1000);
-
     this.logger.debug(
-      `Fetching historic logs for device ${sensor.ksp_device_id} from ${startTime.toISOString()} to ${endTime.toISOString()}`,
+      `Fetching realtime logs for device ${sensor.ksp_device_id}`,
     );
 
     try {
-      const historicLogs = await this.kspService.getDeviceHistoricLogs(
+      // Get current realtime readings (use Digital Twin tags)
+      const realtimeResponse = await this.kspService.getDeviceRealtimeLogs(
         tenant.ksp_contract_id,
         sensor.ksp_device_id,
-        startTime,
-        endTime,
         ['DT_co2', 'DT_temperature', 'DT_humidity', 'DT_serial_number'],
       );
 
-      if (!historicLogs.historics || historicLogs.historics.length === 0) {
-        this.logger.debug(`No recent logs for device ${sensor.ksp_device_id}`);
+      // DEBUG: Log the full response from KSP API
+      this.logger.debug(
+        `KSP API Realtime Response for device ${sensor.ksp_device_id}: ${JSON.stringify(realtimeResponse)}`,
+      );
+
+      // Handle both old and new API response formats
+      const logs = realtimeResponse.realtimeLogs || realtimeResponse.logs || [];
+
+      if (!logs || logs.length === 0) {
+        this.logger.debug(`No realtime logs for device ${sensor.ksp_device_id}`);
         return;
       }
 
-      // Convert historic logs to realtime log format for parsing
-      const realtimeLogs = this.convertHistoricToRealtimeLogs(
-        historicLogs.historics,
-        sensor.ksp_device_id,
-      );
-
       // Parse logs into readings
-      const parsedReadings = this.kspService.parseRealtimeLogs(realtimeLogs);
+      const parsedReadings = this.kspService.parseRealtimeLogs(logs, realtimeResponse);
 
       if (parsedReadings.length === 0) {
         this.logger.debug(
@@ -258,51 +255,54 @@ export class KspSyncService {
         return;
       }
 
-      // Get the latest reading
-      const latestReading = parsedReadings[0];
+      // Get the current reading (realtime should only have one)
+      const currentReading = parsedReadings[0];
 
       // Update sensor serial number if we got it
-      if (latestReading.serialNumber && !sensor.ksp_serial_number) {
-        sensor.ksp_serial_number = latestReading.serialNumber;
+      if (currentReading.serialNumber && !sensor.ksp_serial_number) {
+        sensor.ksp_serial_number = currentReading.serialNumber;
       }
 
-      // Check if reading already exists (avoid duplicates)
-      const existingReading = await this.readingRepository.findOne({
-        where: {
-          sensor_id: sensor.id,
-          timestamp: latestReading.timestamp,
-        },
-      });
+      // Only save if we have CO2 data
+      if (currentReading.co2 !== null) {
+        // Check if reading already exists (avoid duplicates)
+        const existingReading = await this.readingRepository.findOne({
+          where: {
+            sensor_id: sensor.id,
+            timestamp: currentReading.timestamp,
+          },
+        });
 
-      if (!existingReading && latestReading.co2 !== null) {
-        // Create new reading
-        const reading = new SensorReading();
-        reading.sensor_id = sensor.id;
-        reading.co2_level = latestReading.co2 || 0;
-        reading.temperature = latestReading.temperature ?? null;
-        reading.humidity = latestReading.humidity ?? null;
-        reading.timestamp = latestReading.timestamp;
-        reading.source = 2; // REMOTE
+        if (!existingReading) {
+          // Create new reading
+          const reading = new SensorReading();
+          reading.sensor_id = sensor.id;
+          reading.co2_level = Math.round(currentReading.co2);
+          reading.temperature = currentReading.temperature ?? null;
+          reading.humidity = currentReading.humidity ?? null;
+          reading.timestamp = currentReading.timestamp;
+          reading.source = 2; // REMOTE
 
-        await this.readingRepository.save(reading);
+          await this.readingRepository.save(reading);
 
-        // Update sensor's last reading fields (denormalized)
-        sensor.last_reading_co2 = latestReading.co2;
-        sensor.last_reading_temperature = latestReading.temperature ?? null;
-        sensor.last_reading_humidity = latestReading.humidity ?? null;
-        sensor.last_reading_at = latestReading.timestamp;
+          this.logger.log(
+            `✅ Saved realtime reading for sensor ${sensor.name}: CO2=${currentReading.co2}ppm, Temp=${currentReading.temperature}°C, Humidity=${currentReading.humidity}% at ${currentReading.timestamp.toISOString()}`,
+          );
+        } else {
+          this.logger.debug(
+            `Reading already exists for sensor ${sensor.id} at ${currentReading.timestamp.toISOString()}`,
+          );
+        }
 
-        this.logger.debug(
-          `Saved reading for sensor ${sensor.id}: CO2=${latestReading.co2}ppm at ${latestReading.timestamp.toISOString()}`,
-        );
-      } else if (existingReading) {
-        this.logger.debug(
-          `Reading already exists for sensor ${sensor.id} at ${latestReading.timestamp.toISOString()}`,
-        );
+        // Always update sensor's last reading fields from the current data
+        sensor.last_reading_co2 = Math.round(currentReading.co2);
+        sensor.last_reading_temperature = currentReading.temperature ?? null;
+        sensor.last_reading_humidity = currentReading.humidity ?? null;
+        sensor.last_reading_at = currentReading.timestamp;
       }
     } catch (error) {
       this.logger.error(
-        `Error fetching historic logs for device ${sensor.ksp_device_id}`,
+        `Error fetching realtime logs for device ${sensor.ksp_device_id}`,
         error.stack,
       );
       throw error;
@@ -334,6 +334,201 @@ export class KspSyncService {
     }
 
     return realtimeLogs;
+  }
+
+  /**
+   * Convert all historic logs to readings (not just the latest)
+   */
+  private convertAllHistoricLogsToReadings(
+    historics: KspHistoricLog[],
+  ): any[] {
+    // Group logs by timestamp
+    const timestampMap = new Map<number, any>();
+
+    for (const historic of historics) {
+      if (!historic.logs || historic.logs.length === 0) continue;
+
+      // Process ALL log entries, not just the latest
+      for (const log of historic.logs) {
+        if (!timestampMap.has(log.timestamp)) {
+          timestampMap.set(log.timestamp, {
+            timestamp: log.timestamp,
+            source: log.source,
+            co2: null,
+            temperature: null,
+            humidity: null,
+          });
+        }
+
+        const reading = timestampMap.get(log.timestamp);
+
+        // Map tag reference to reading field
+        switch (historic.tagReference) {
+          case 'p_CO2':
+            reading.co2 = parseFloat(log.value);
+            break;
+          case 'p_temperature':
+            reading.temperature = parseFloat(log.value);
+            break;
+          case 'p_humidity':
+            reading.humidity = parseFloat(log.value);
+            break;
+        }
+      }
+    }
+
+    // Convert to array and sort by timestamp (oldest first)
+    return Array.from(timestampMap.values()).sort(
+      (a, b) => a.timestamp - b.timestamp,
+    );
+  }
+
+  /**
+   * Sync historical data for a specific sensor
+   * This fetches and stores historical readings over a specified period
+   */
+  async syncSensorHistory(
+    sensorId: string,
+    daysBack: number = 30,
+  ): Promise<{ success: boolean; readingsImported: number; message: string }> {
+    this.logger.log(
+      `Starting historical sync for sensor ${sensorId} (${daysBack} days back)`,
+    );
+
+    // Find the sensor
+    const sensor = await this.sensorRepository.findOne({
+      where: { id: sensorId },
+      relations: ['tenant'],
+    });
+
+    if (!sensor) {
+      throw new Error(`Sensor ${sensorId} not found`);
+    }
+
+    if (!sensor.tenant?.ksp_contract_id) {
+      throw new Error(
+        `Sensor ${sensorId} has no associated tenant with KSP contract ID`,
+      );
+    }
+
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - daysBack * 24 * 60 * 60 * 1000);
+
+    this.logger.log(
+      `Fetching historical data from ${startTime.toISOString()} to ${endTime.toISOString()}`,
+    );
+
+    try {
+      // Fetch historical data from KSP
+      const historicLogs = await this.kspService.getDeviceHistoricLogs(
+        sensor.tenant.ksp_contract_id,
+        sensor.ksp_device_id,
+        startTime,
+        endTime,
+        ['DT_co2', 'DT_temperature', 'DT_humidity'],
+      );
+
+      if (!historicLogs.historics || historicLogs.historics.length === 0) {
+        this.logger.warn(
+          `No historical data found for sensor ${sensorId} (device ${sensor.ksp_device_id})`,
+        );
+        return {
+          success: true,
+          readingsImported: 0,
+          message: 'No historical data available',
+        };
+      }
+
+      // Convert all historic logs to readings
+      const readings = this.convertAllHistoricLogsToReadings(
+        historicLogs.historics,
+      );
+
+      this.logger.log(`Processing ${readings.length} historical readings`);
+
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      // Insert readings in batches to avoid overwhelming the database
+      const batchSize = 500;
+      for (let i = 0; i < readings.length; i += batchSize) {
+        const batch = readings.slice(i, i + batchSize);
+
+        for (const reading of batch) {
+          // Skip readings without CO2 data
+          if (reading.co2 === null || reading.co2 === undefined) {
+            skippedCount++;
+            continue;
+          }
+
+          // Convert KSP timestamp to Date
+          const timestamp = this.kspService.kspTimestampToDate(
+            reading.timestamp,
+          );
+
+          // Check if reading already exists
+          const exists = await this.readingRepository.findOne({
+            where: {
+              sensor_id: sensor.id,
+              timestamp: timestamp,
+            },
+          });
+
+          if (exists) {
+            skippedCount++;
+            continue;
+          }
+
+          // Create and save new reading
+          const newReading = new SensorReading();
+          newReading.sensor_id = sensor.id;
+          newReading.co2_level = Math.round(reading.co2);
+          newReading.temperature = reading.temperature ?? null;
+          newReading.humidity = reading.humidity ?? null;
+          newReading.timestamp = timestamp;
+          newReading.source = reading.source || 2; // Default to REMOTE
+
+          await this.readingRepository.save(newReading);
+          importedCount++;
+        }
+
+        this.logger.debug(
+          `Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(readings.length / batchSize)}: ${importedCount} imported, ${skippedCount} skipped`,
+        );
+      }
+
+      // Update sensor's last reading if we imported data
+      if (importedCount > 0) {
+        const latestReading = await this.readingRepository.findOne({
+          where: { sensor_id: sensor.id },
+          order: { timestamp: 'DESC' },
+        });
+
+        if (latestReading) {
+          sensor.last_reading_co2 = latestReading.co2_level;
+          sensor.last_reading_temperature = latestReading.temperature;
+          sensor.last_reading_humidity = latestReading.humidity;
+          sensor.last_reading_at = latestReading.timestamp;
+          await this.sensorRepository.save(sensor);
+        }
+      }
+
+      this.logger.log(
+        `Historical sync completed for sensor ${sensorId}: ${importedCount} readings imported, ${skippedCount} skipped`,
+      );
+
+      return {
+        success: true,
+        readingsImported: importedCount,
+        message: `Successfully imported ${importedCount} readings (${skippedCount} duplicates skipped)`,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error syncing historical data for sensor ${sensorId}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**

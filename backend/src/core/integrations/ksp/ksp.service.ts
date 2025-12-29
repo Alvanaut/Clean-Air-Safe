@@ -21,7 +21,7 @@ import { AxiosInstance } from 'axios';
 export class KspService {
   private readonly logger = new Logger(KspService.name);
 
-  // Timestamp base: 2000-01-01 00:00:00
+  // Timestamp base: 2000-01-01 00:00:00 UTC
   private readonly KSP_EPOCH = new Date('2000-01-01T00:00:00Z').getTime();
 
   constructor(private kspAuthService: KspAuthService) {}
@@ -30,14 +30,14 @@ export class KspService {
    * Convert KSP timestamp to JavaScript Date
    * KSP timestamps are seconds since 2000-01-01 00:00:00
    */
-  private kspTimestampToDate(kspTimestamp: number): Date {
+  public kspTimestampToDate(kspTimestamp: number): Date {
     return new Date(this.KSP_EPOCH + kspTimestamp * 1000);
   }
 
   /**
    * Convert JavaScript Date to KSP timestamp
    */
-  private dateToKspTimestamp(date: Date): number {
+  public dateToKspTimestamp(date: Date): number {
     return Math.floor((date.getTime() - this.KSP_EPOCH) / 1000);
   }
 
@@ -107,9 +107,10 @@ export class KspService {
     }
 
     const url = `/devices/realtimes?${queryParams.toString()}`;
-    this.logger.debug('GET', url);
+    this.logger.debug(`GET ${url}`);
 
     const response = await client.get<KspRealtimeLogsResponse>(url);
+    this.logger.debug(`Realtime logs response:`, JSON.stringify(response.data));
     return response.data;
   }
 
@@ -131,45 +132,76 @@ export class KspService {
       KspTagReference.SERIAL_NUMBER,
     ];
 
-    // KSP API expects arrays of strings joined with commas inside array
-    // Format: {"DeviceIdentifier": ["1, 2"], "TagReference": ["TAG_1, TAG_2"]}
+    // Try simple array format instead of comma-separated strings
     const body = {
-      DeviceIdentifier: [deviceIdentifiers.join(', ')],
-      TagReference: [tags.join(', ')],
+      DeviceIdentifier: deviceIdentifiers,
+      TagReference: tags,
     };
 
     this.logger.debug('POST /devices/realtimes', { contractId, body });
 
-    const response = await client.post<KspRealtimeLogsResponse>(
-      '/devices/realtimes',
-      body,
-      {
-        params: { contractId },
-      },
-    );
+    try {
+      const response = await client.post<KspRealtimeLogsResponse>(
+        '/devices/realtimes',
+        body,
+        {
+          params: { contractId },
+        },
+      );
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      this.logger.error('KSP realtime API error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        body: body,
+        contractId: contractId,
+      });
+      throw error;
+    }
   }
 
   /**
    * Parse real-time logs into structured sensor readings
    */
-  parseRealtimeLogs(logs: KspRealtimeLog[]): ParsedSensorReading[] {
-    // Group by device
+  parseRealtimeLogs(logs: KspRealtimeLog[], responseData?: KspRealtimeLogsResponse): ParsedSensorReading[] {
+    // Handle new API format where logs are in realtimeLogs array
+    const logsArray = logs || responseData?.realtimeLogs || responseData?.logs || [];
+
+    if (logsArray.length === 0) {
+      this.logger.debug('No realtime logs found in response');
+      return [];
+    }
+
+    this.logger.debug(`Parsing ${logsArray.length} realtime logs`);
+
+    // Group by device (use "default" if no deviceIdentifier for single device queries)
     const deviceMap = new Map<string, Partial<ParsedSensorReading>>();
 
-    for (const log of logs) {
-      const deviceId = log.deviceIdentifier;
-      if (!deviceId) continue;
+    for (const log of logsArray) {
+      // Use deviceIdentifier if present, otherwise use "default" for single device queries
+      const deviceId = log.deviceIdentifier || 'default';
 
       if (!deviceMap.has(deviceId)) {
+        // Parse timestamp - handle both number (seconds since 2000) and ISO string
+        let timestamp: Date;
+        if (typeof log.timestamp === 'number') {
+          timestamp = this.kspTimestampToDate(log.timestamp);
+        } else if ((log as any).datetime) {
+          // New API format uses "datetime" instead of "timestamp"
+          timestamp = new Date((log as any).datetime);
+        } else {
+          timestamp = new Date();
+        }
+
         deviceMap.set(deviceId, {
           deviceId,
           co2: null,
           temperature: null,
           humidity: null,
           serialNumber: null,
-          timestamp: this.kspTimestampToDate(log.timestamp),
+          timestamp: timestamp,
         });
       }
 
@@ -178,21 +210,37 @@ export class KspService {
 
       switch (log.tagReference) {
         case KspTagReference.CO2:
+        case 'p_CO2':
+        case 'DT_co2':
           reading.co2 = parseFloat(log.value);
           break;
         case KspTagReference.TEMPERATURE:
+        case 'p_temperature':
+        case 'DT_temperature':
           reading.temperature = parseFloat(log.value);
           break;
         case KspTagReference.HUMIDITY:
+        case 'p_humidity':
+        case 'DT_humidity':
           reading.humidity = parseFloat(log.value);
           break;
         case KspTagReference.SERIAL_NUMBER:
+        case 'sys_device_sn':
+        case 'DT_serial_number':
           reading.serialNumber = log.value;
           break;
       }
 
       // Update timestamp to most recent
-      const logDate = this.kspTimestampToDate(log.timestamp);
+      let logDate: Date;
+      if (typeof log.timestamp === 'number') {
+        logDate = this.kspTimestampToDate(log.timestamp);
+      } else if ((log as any).datetime) {
+        logDate = new Date((log as any).datetime);
+      } else {
+        logDate = new Date();
+      }
+
       if (reading.timestamp && logDate > reading.timestamp) {
         reading.timestamp = logDate;
       }
