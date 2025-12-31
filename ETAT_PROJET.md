@@ -2,7 +2,7 @@
 
 **Dernière mise à jour:** 31 Décembre 2024
 
-## 📊 Avancement Global: ~70%
+## 📊 Avancement Global: ~80%
 
 ### ✅ Fonctionnalités Implémentées
 
@@ -18,46 +18,64 @@
 - [x] Stockage des readings (CO2, Température, Humidité)
 - [x] QR Code unique par capteur
 - [x] Timezone UTC en base + conversion Brussels en frontend
+- [x] **WebSocket Gateway** pour mises à jour temps réel
+- [x] **Baseline CO2 automatique** - Cron hebdomadaire (Dimanche 3h)
+- [x] **Safety Score** - Calcul A-F basé sur critères COVID
 
 #### Frontend (Next.js 14 + React Query)
 - [x] Architecture Next.js avec App Router
 - [x] Pages: Dashboard, Sensors, Buildings, Users, Tenants
-- [x] **Graphique CO2** avec Recharts (affichage 24h)
+- [x] **Graphique CO2** avec Recharts (affichage 2h)
+- [x] **Zones colorées graphique** (vert/orange/rouge basé sur baseline)
+- [x] **Lignes de référence** (baseline + seuils orange/rouge)
+- [x] **Badge status CO2** avec code couleur dynamique
 - [x] Composants UI réutilisables (Card, Button, Table, Modal, Input, Select)
 - [x] Auth Store avec Zustand
 - [x] React Query pour cache et data fetching
+- [x] **WebSocket client** avec hook useWebSocket
+- [x] **Invalidation cache temps réel** via WebSocket events
 - [x] **Formulaire Buildings** avec adresse complète
 - [x] **Dropdown Buildings** dans création capteur
 - [x] Affichage building assigné dans détail capteur
+- [x] **Correction timezone** - Europe/Brussels sans offset manuel
 - [x] Dark mode support
 - [x] Sidebar avec navigation par rôle
 
-### 🔄 En Cours / Prochaine Étape
+### ✅ Phase 1 Complétée - Code Couleur CO2
 
-#### Code Couleur CO2 - Réglementation Belge
 **Principe:** Baseline dynamique par zone + offset
 
 ```
-Baseline = CO2 mesuré à vide (espace sans personnes)
+Baseline = 5ème percentile du CO2 sur 7 jours (espace vide)
 
 🟢 VERT:   CO2 ≤ Baseline + 500 ppm
 🟠 ORANGE:  Baseline + 500 < CO2 ≤ Baseline + 700 ppm
 🔴 ROUGE:   CO2 > Baseline + 700 ppm
 ```
 
-**Implémentation à faire:**
-1. Ajouter `co2_baseline` dans Space entity
-2. Créer BaselineService avec cron hebdomadaire
-   - Exécution: Dimanche 3h du matin
-   - Calcul: Moyenne CO2 entre 2h-3h pour tous capteurs de la zone
-   - Défaut: 450 ppm si pas de données
-3. Créer utils/co2-thresholds.ts pour calcul dynamique
-4. Mettre à jour CO2Chart avec zones colorées
-5. Afficher status avec code couleur dans sensor detail
+**Implémentation réalisée:**
+- [x] Champ `co2_baseline` dans Space entity
+- [x] BaselineService avec cron hebdomadaire (Dimanche 3h)
+  - Calcul: 5ème percentile CO2 sur 7 jours
+  - Défaut: 400 ppm si pas de données
+- [x] lib/co2-thresholds.ts pour calcul dynamique
+- [x] CO2Chart avec zones colorées + lignes de référence
+- [x] Badge status couleur dans sensor detail
+- [x] WebSocket pour mises à jour temps réel
+- [x] Fix timezone (Europe/Brussels)
+
+### 🔄 Phase 2 En Cours - Mises à Jour Temps Réel
+
+**Objectif:** Valider le fonctionnement complet du WebSocket
+
+**À tester:**
+- [ ] Vérifier réception événements WebSocket dans console browser
+- [ ] Confirmer invalidation cache React Query automatique
+- [ ] Tester mise à jour graphique lors du prochain sync (toutes les 10min)
 
 ### ❌ Non Implémenté
 
-#### Haute Priorité
+#### Haute Priorité (Phase 3)
 - [ ] **Système d'Alertes**
   - Entité Alert existe en DB
   - Logique de déclenchement à implémenter
@@ -92,10 +110,11 @@ backend/
 │   │   ├── tenants/         # Multi-tenant
 │   │   ├── users/           # Utilisateurs
 │   │   ├── sensors/         # Capteurs
-│   │   ├── spaces/          # Bâtiments/Zones ✅ NOUVEAU
+│   │   ├── spaces/          # Bâtiments/Zones + Baseline ✅
 │   │   ├── readings/        # Mesures CO2
 │   │   ├── sync/            # Sync KSP (cron 10min)
-│   │   └── alerts/          # Alertes (DB only)
+│   │   ├── alerts/          # Alertes (DB only)
+│   │   └── websocket/       # WebSocket Gateway ✅ NOUVEAU
 │   └── app.module.ts
 └── .env                     # TZ=UTC
 ```
@@ -115,7 +134,11 @@ frontend/
 │   └── sensors/             # CO2Chart ✅
 ├── lib/
 │   ├── api.ts               # API client (axios)
-│   └── api-client.ts        # Axios instance
+│   ├── api-client.ts        # Axios instance
+│   ├── websocket.ts         # WebSocket client ✅ NOUVEAU
+│   └── co2-thresholds.ts    # Calculs seuils CO2 ✅ NOUVEAU
+├── hooks/
+│   └── useWebSocket.ts      # Hook WebSocket + React Query ✅ NOUVEAU
 ├── store/
 │   └── auth-store.ts        # Zustand store
 └── types/
@@ -166,22 +189,29 @@ SELECT id, name, type, tenant_id FROM spaces WHERE type = 'building';
 
 ## 📋 Roadmap
 
-### Phase 1 - Code Couleur (En cours)
-- [ ] Baseline automatique par zone
-- [ ] Affichage zones colorées graphique
-- [ ] Badge couleur status CO2
+### Phase 1 - Code Couleur ✅ COMPLÉTÉ
+- [x] Baseline automatique par zone
+- [x] Affichage zones colorées graphique
+- [x] Badge couleur status CO2
+- [x] WebSocket temps réel
+- [x] Fix timezone
 
-### Phase 2 - Alertes
+### Phase 2 - Validation WebSocket (En cours)
+- [ ] Tests événements temps réel
+- [ ] Vérification invalidation cache
+- [ ] Optimisation performance
+
+### Phase 3 - Alertes
 - [ ] Logique déclenchement alertes
 - [ ] Email notifications
 - [ ] Cascade responsabilité
 
-### Phase 3 - Gestion Utilisateurs
+### Phase 4 - Gestion Utilisateurs
 - [ ] Token invitation
 - [ ] Assignment responsables UI
 - [ ] Champ poste
 
-### Phase 4 - Optimisations
+### Phase 5 - Optimisations
 - [ ] Batterie affichage
 - [ ] Performance improvements
 - [ ] Tests unitaires
@@ -198,8 +228,12 @@ SELECT id, name, type, tenant_id FROM spaces WHERE type = 'building';
 ### Flux de Données
 ```
 KSP API → Backend Cron (10min) → PostgreSQL → Backend API → Frontend
-                                       ↓
-                                  Readings DB
+                ↓                      ↓            ↓
+         Save Readings          WebSocket    React Query
+                                   ↓              ↓
+                            Frontend Client ← Cache Invalidation
+                                   ↓
+                              Auto Refresh
 ```
 
 ### Hiérarchie Spaces
