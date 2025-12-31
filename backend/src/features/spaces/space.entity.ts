@@ -41,6 +41,7 @@ export enum SafetyScore {
   D = 'D',
   E = 'E',
   F = 'F',
+  G = 'G',
 }
 
 export const SpaceTypeValues = {

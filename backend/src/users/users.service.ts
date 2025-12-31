@@ -32,6 +32,15 @@ export class UsersService {
     createUserDto: CreateUserDto,
     createdBy: User,
   ): Promise<User> {
+    // Validate tenant_id requirement
+    if (createUserDto.role !== UserRole.GODMODE) {
+      if (!createUserDto.tenant_id) {
+        throw new BadRequestException(
+          'tenant_id is required for non-GODMODE users',
+        );
+      }
+    }
+
     // Check permissions
     if (createdBy.role !== UserRole.GODMODE) {
       // COMPANY_ADMIN can only create users in their own tenant
@@ -117,9 +126,17 @@ export class UsersService {
       // GODMODE sees everyone
       return await queryBuilder.orderBy('user.created_at', 'DESC').getMany();
     } else if (currentUser.role === UserRole.COMPANY_ADMIN) {
-      // COMPANY_ADMIN sees only their tenant
+      // COMPANY_ADMIN must have a tenant_id
+      if (!currentUser.tenant_id) {
+        throw new ForbiddenException('User is not associated with any tenant');
+      }
+
+      // COMPANY_ADMIN sees only their tenant (excluding GODMODE and other COMPANY_ADMINs)
       return await queryBuilder
         .where('user.tenant_id = :tenantId', { tenantId: currentUser.tenant_id })
+        .andWhere('user.role NOT IN (:...excludedRoles)', {
+          excludedRoles: [UserRole.GODMODE, UserRole.COMPANY_ADMIN]
+        })
         .orderBy('user.created_at', 'DESC')
         .getMany();
     } else {
@@ -167,7 +184,7 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     currentUser: User,
   ): Promise<User> {
-    const user = await this.findOne(id);
+    const user = await this.findOne(id, currentUser);
 
     // Check permissions
     await this.checkUpdatePermission(currentUser, user, updateUserDto);
@@ -223,17 +240,27 @@ export class UsersService {
    * Delete a user
    */
   async remove(id: string, currentUser: User): Promise<void> {
-    const user = await this.findOne(id);
+    const user = await this.findOne(id, currentUser);
 
-    // Check permissions
+    // Additional security checks
     if (currentUser.role !== UserRole.GODMODE) {
+      // COMPANY_ADMIN cannot delete GODMODE or COMPANY_ADMIN users
       if (currentUser.role === UserRole.COMPANY_ADMIN) {
+        if (user.role === UserRole.GODMODE || user.role === UserRole.COMPANY_ADMIN) {
+          throw new ForbiddenException('You cannot delete GODMODE or COMPANY_ADMIN users');
+        }
+
         if (user.tenant_id !== currentUser.tenant_id) {
           throw new ForbiddenException('You can only delete users in your tenant');
         }
       } else {
         throw new ForbiddenException('You do not have permission to delete users');
       }
+    }
+
+    // Prevent deleting yourself
+    if (currentUser.id === user.id) {
+      throw new ForbiddenException('You cannot delete your own account');
     }
 
     // Check if user has subordinates
@@ -382,6 +409,11 @@ export class UsersService {
     }
 
     if (currentUser.role === UserRole.COMPANY_ADMIN) {
+      // Cannot update GODMODE or COMPANY_ADMIN users
+      if (targetUser.role === UserRole.GODMODE || targetUser.role === UserRole.COMPANY_ADMIN) {
+        throw new ForbiddenException('You cannot update GODMODE or COMPANY_ADMIN users');
+      }
+
       if (targetUser.tenant_id !== currentUser.tenant_id) {
         throw new ForbiddenException('You can only update users in your tenant');
       }

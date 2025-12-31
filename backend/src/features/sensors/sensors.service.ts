@@ -50,6 +50,11 @@ export class SensorsService {
     if (currentUser.role === UserRole.GODMODE) {
       // GODMODE sees all sensors
     } else if (currentUser.role === UserRole.COMPANY_ADMIN || currentUser.role === UserRole.MANAGER) {
+      // Company admin and managers must have a tenant_id
+      if (!currentUser.tenant_id) {
+        throw new ForbiddenException('User is not associated with any tenant');
+      }
+
       // Company admin and managers see all sensors in their tenant
       queryBuilder.where('sensor.tenant_id = :tenantId', { tenantId: currentUser.tenant_id });
     } else {
@@ -63,6 +68,11 @@ export class SensorsService {
   async findByTenant(tenantId: string, currentUser: User): Promise<Sensor[]> {
     // Check permissions
     if (currentUser.role !== UserRole.GODMODE) {
+      // Non-GODMODE users must have a tenant_id
+      if (!currentUser.tenant_id) {
+        throw new ForbiddenException('User is not associated with any tenant');
+      }
+
       if (currentUser.tenant_id !== tenantId) {
         throw new ForbiddenException('Access denied');
       }
