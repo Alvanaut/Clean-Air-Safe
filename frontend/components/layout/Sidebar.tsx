@@ -25,6 +25,12 @@ const navItems: NavItem[] = [
     icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z',
   },
   {
+    label: 'Buildings',
+    href: '/buildings',
+    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+    roles: ['godmode', 'company_admin'],
+  },
+  {
     label: 'Users',
     href: '/users',
     icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
@@ -42,6 +48,10 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
+
+  // DEBUG: Log user info
+  console.log('Sidebar - User object:', user);
+  console.log('Sidebar - User role:', user?.role);
 
   const filteredNavItems = navItems.filter(
     (item) => !item.roles || (user?.role && item.roles.includes(user.role))
@@ -120,7 +130,7 @@ export function Sidebar() {
         {user && (
           <div className="px-4 py-2">
             <p className="text-sm font-medium text-gray-900 dark:text-white">
-              {user.first_name} {user.last_name}
+              {user.firstName || user.first_name} {user.lastName || user.last_name}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

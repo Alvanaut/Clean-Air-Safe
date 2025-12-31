@@ -60,33 +60,58 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initialize: async () => {
+    console.log('🔄 Auth Store - Initialize called');
     set({ isLoading: true });
     try {
       const token = localStorage.getItem('access_token');
       const userStr = localStorage.getItem('user');
+      console.log('📦 Auth Store - Token exists:', !!token);
+      console.log('📦 Auth Store - User string:', userStr);
 
       if (token && userStr) {
         try {
-          // Verify token is still valid by fetching current user
+          // Parse stored user as fallback
+          const storedUser = JSON.parse(userStr);
+          console.log('✅ Auth Store - Parsed stored user:', storedUser);
+
+          // Try to verify token is still valid by fetching current user
           const user = await authApi.getMe();
+          console.log('✅ Auth Store - API getMe success:', user);
           set({
             user,
             token,
             isAuthenticated: true,
             isLoading: false
           });
+          console.log('✅ Auth Store - State set with API user');
         } catch (error) {
-          // Token is invalid, clear storage
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('user');
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
+          // If API fails, try to use stored user as fallback
+          console.warn('⚠️ API getMe failed, using stored user:', error);
+          try {
+            const storedUser = JSON.parse(userStr);
+            console.log('✅ Auth Store - Using fallback user:', storedUser);
+            set({
+              user: storedUser,
+              token,
+              isAuthenticated: true,
+              isLoading: false
+            });
+            console.log('✅ Auth Store - State set with fallback user');
+          } catch (parseError) {
+            console.error('❌ Auth Store - Parse error:', parseError);
+            // Token is invalid or stored user is corrupted, clear storage
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('user');
+            set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              isLoading: false
+            });
+          }
         }
       } else {
+        console.log('❌ Auth Store - No token or user in localStorage');
         set({
           user: null,
           token: null,
@@ -95,6 +120,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         });
       }
     } catch (error) {
+      console.error('❌ Auth Store - Initialize error:', error);
       set({
         user: null,
         token: null,

@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { CO2Chart } from '@/components/sensors/CO2Chart';
+import { getCO2Status } from '@/lib/co2-thresholds';
 
 export default function SensorDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -114,6 +115,50 @@ export default function SensorDetailPage({ params }: { params: { id: string } })
                     </span>
                   </dd>
                 </div>
+                {sensor.space && (
+                  <>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        Bâtiment
+                      </dt>
+                      <dd className="mt-1">
+                        <p className="font-medium">{sensor.space.name}</p>
+                        {sensor.space.metadata?.address && (
+                          <p className="text-sm text-gray-500">
+                            {sensor.space.metadata.address}
+                            {sensor.space.metadata.postal_code && `, ${sensor.space.metadata.postal_code}`}
+                            {sensor.space.metadata.city && ` ${sensor.space.metadata.city}`}
+                          </p>
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        Baseline CO2
+                      </dt>
+                      <dd className="mt-1 font-medium">{sensor.space.co2_baseline} ppm</dd>
+                    </div>
+                    {sensor.space.safety_score && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                          Score de Sécurité
+                        </dt>
+                        <dd className="mt-1">
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            sensor.space.safety_score === 'A' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                            sensor.space.safety_score === 'B' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                            sensor.space.safety_score === 'C' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                            sensor.space.safety_score === 'D' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+                            sensor.space.safety_score === 'E' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                            'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100'
+                          }`}>
+                            {sensor.space.safety_score}
+                          </span>
+                        </dd>
+                      </div>
+                    )}
+                  </>
+                )}
               </dl>
             </div>
           </Card>
@@ -148,7 +193,21 @@ export default function SensorDetailPage({ params }: { params: { id: string } })
               {sensor.last_reading_at ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="text-gray-600 dark:text-gray-300">CO2</span>
+                    <div className="flex flex-col">
+                      <span className="text-gray-600 dark:text-gray-300">CO2</span>
+                      {sensor.space?.co2_baseline && sensor.last_reading_co2 && (
+                        <span className="text-xs mt-1">
+                          {(() => {
+                            const status = getCO2Status(sensor.last_reading_co2, sensor.space.co2_baseline);
+                            return (
+                              <span className={`px-2 py-0.5 rounded-full ${status.bgColor} ${status.textColor} font-medium`}>
+                                {status.label}
+                              </span>
+                            );
+                          })()}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-2xl font-bold">
                       {sensor.last_reading_co2 || '-'} ppm
                     </span>
@@ -219,7 +278,10 @@ export default function SensorDetailPage({ params }: { params: { id: string } })
         </div>
 
         <div className="mt-6">
-          <CO2Chart sensorId={params.id} />
+          <CO2Chart
+            sensorId={params.id}
+            baseline={sensor.space?.co2_baseline || 400}
+          />
         </div>
       </div>
     </DashboardLayout>

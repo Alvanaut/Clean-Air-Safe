@@ -6,15 +6,17 @@ export type SyncStatus = 'active' | 'inactive' | 'error';
 export interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  firstName?: string; // Backend returns camelCase
+  lastName?: string;  // Backend returns camelCase
+  first_name?: string; // Keep for backward compatibility
+  last_name?: string;  // Keep for backward compatibility
   phone?: string;
   role: UserRole;
   status: 'active' | 'inactive';
-  tenantId?: string;
-  tenant_id?: string;
-  created_at: string;
-  updated_at: string;
+  tenantId?: string;  // Backend returns camelCase
+  tenant_id?: string; // Keep for backward compatibility
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Tenant {
@@ -38,6 +40,8 @@ export interface Sensor {
   status: SensorStatus;
   qr_code: string;
   tenant_id: string;
+  space_id?: string;
+  space?: Space;
   last_reading_at?: string;
   last_reading_co2?: number;
   last_reading_temperature?: number;
@@ -77,6 +81,7 @@ export interface CreateSensorRequest {
   description?: string;
   ksp_device_id: string;
   tenant_id: string;
+  space_id?: string;
 }
 
 export interface UpdateSensorRequest {
@@ -146,4 +151,84 @@ export interface GetReadingsResponse {
     name: string;
     ksp_device_id: string;
   };
+}
+
+export type SpaceType = 'building' | 'floor' | 'room' | 'zone' | 'area';
+export type VentilationLevel = 'none' | 'natural' | 'mechanical' | 'hepa';
+export type CleaningFrequency = 'none' | 'weekly' | 'daily' | 'hourly';
+export type SafetyScore = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
+export interface Space {
+  id: string;
+  name: string;
+  description?: string;
+  type: SpaceType;
+  parent_space_id?: string;
+  hierarchy_path?: string;
+  responsible_user_id?: string;
+  tenant_id: string;
+  metadata?: Record<string, any>;
+  // CO2 Baseline
+  co2_baseline: number;
+  // Safety & Hygiene Compliance
+  has_hydro_gel: boolean;
+  has_temp_check: boolean;
+  has_mask_required: boolean;
+  ventilation_level: VentilationLevel;
+  max_capacity?: number;
+  current_capacity?: number;
+  cleaning_frequency: CleaningFrequency;
+  has_isolation_room: boolean;
+  social_distancing: boolean;
+  safety_score?: SafetyScore;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Building {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  postal_code?: string;
+  full_address: string;
+}
+
+export interface CreateSpaceRequest {
+  name: string;
+  description?: string;
+  type: SpaceType;
+  parent_space_id?: string;
+  tenant_id: string;
+  metadata?: Record<string, any>;
+  // CO2 Baseline
+  co2_baseline?: number;
+  // Safety compliance
+  has_hydro_gel?: boolean;
+  has_temp_check?: boolean;
+  has_mask_required?: boolean;
+  ventilation_level?: VentilationLevel;
+  max_capacity?: number;
+  current_capacity?: number;
+  cleaning_frequency?: CleaningFrequency;
+  has_isolation_room?: boolean;
+  social_distancing?: boolean;
+}
+
+export interface UpdateSpaceRequest {
+  name?: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  // CO2 Baseline
+  co2_baseline?: number;
+  // Safety compliance
+  has_hydro_gel?: boolean;
+  has_temp_check?: boolean;
+  has_mask_required?: boolean;
+  ventilation_level?: VentilationLevel;
+  max_capacity?: number;
+  current_capacity?: number;
+  cleaning_frequency?: CleaningFrequency;
+  has_isolation_room?: boolean;
+  social_distancing?: boolean;
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sensorsApi } from '@/lib/api';
+import { sensorsApi, spacesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth-store';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Table } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
@@ -31,6 +32,12 @@ export default function SensorsPage() {
   const { data: sensors, isLoading } = useQuery({
     queryKey: ['sensors'],
     queryFn: sensorsApi.getAll,
+  });
+
+  const { data: buildings } = useQuery({
+    queryKey: ['buildings', user?.tenantId],
+    queryFn: () => spacesApi.getBuildingsByTenant(user?.tenantId || ''),
+    enabled: !!user?.tenantId,
   });
 
   const createMutation = useMutation({
@@ -190,6 +197,18 @@ export default function SensorsPage() {
               onChange={(e) => setFormData({ ...formData, ksp_device_id: e.target.value })}
               placeholder="device-12345"
               required
+            />
+            <Select
+              label="Bâtiment (optionnel)"
+              value={formData.space_id || ''}
+              onChange={(e) => setFormData({ ...formData, space_id: e.target.value || undefined })}
+              options={[
+                { value: '', label: '-- Aucun bâtiment --' },
+                ...(buildings || []).map((building) => ({
+                  value: building.id,
+                  label: building.full_address,
+                })),
+              ]}
             />
             <div className="flex gap-3 justify-end mt-6">
               <Button

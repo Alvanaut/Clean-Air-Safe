@@ -22,6 +22,9 @@ import { SpacesModule } from './features/spaces/spaces.module';
 // KSP Integration
 import { KspModule } from './core/integrations/ksp/ksp.module';
 
+// WebSocket
+import { WebsocketModule } from './websocket/websocket.module';
+
 @Module({
   imports: [
     // Configuration
@@ -50,6 +53,9 @@ import { KspModule } from './core/integrations/ksp/ksp.module';
 
     // KSP Integration
     KspModule,
+
+    // WebSocket
+    WebsocketModule,
 
     // Features
     AuthModule,

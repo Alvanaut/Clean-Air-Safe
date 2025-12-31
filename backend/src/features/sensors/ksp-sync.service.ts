@@ -12,6 +12,7 @@ import {
 import { Sensor, SensorStatus } from './sensor.entity';
 import { SensorReading } from '../readings/sensor-reading.entity';
 import { Tenant, TenantStatus } from '../../tenants/tenant.entity';
+import { SyncGateway } from '../../websocket/websocket.gateway';
 
 @Injectable()
 export class KspSyncService {
@@ -22,6 +23,7 @@ export class KspSyncService {
   constructor(
     private readonly kspService: KspService,
     private readonly configService: ConfigService,
+    private readonly syncGateway: SyncGateway,
     @InjectRepository(Sensor)
     private readonly sensorRepository: Repository<Sensor>,
     @InjectRepository(SensorReading)
@@ -145,6 +147,11 @@ export class KspSyncService {
       }
 
       this.logger.log(`Completed sync for tenant: ${tenant.name}`);
+
+      // Emit WebSocket event when sync is completed
+      this.syncGateway.emitSyncCompleted(tenant.id, {
+        devicesCount: devicesResponse.devices.length,
+      });
     } catch (error) {
       this.logger.error(`Error syncing tenant ${tenant.name}`, error.stack);
       throw error;
@@ -288,6 +295,14 @@ export class KspSyncService {
           this.logger.log(
             `✅ Saved realtime reading for sensor ${sensor.name}: CO2=${currentReading.co2}ppm, Temp=${currentReading.temperature}°C, Humidity=${currentReading.humidity}% at ${currentReading.timestamp.toISOString()}`,
           );
+
+          // Emit WebSocket event for real-time updates
+          this.syncGateway.emitSensorReadingsUpdate(sensor.id, {
+            co2: Math.round(currentReading.co2),
+            temperature: currentReading.temperature,
+            humidity: currentReading.humidity,
+            timestamp: currentReading.timestamp,
+          });
         } else {
           this.logger.debug(
             `Reading already exists for sensor ${sensor.id} at ${currentReading.timestamp.toISOString()}`,

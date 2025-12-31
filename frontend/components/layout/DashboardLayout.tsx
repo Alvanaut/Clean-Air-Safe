@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth-store';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, initialize } = useAuthStore();
   const router = useRouter();
+
+  // Connect to WebSocket for real-time updates
+  useWebSocket();
 
   useEffect(() => {
     initialize();

@@ -45,7 +45,7 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="p-8">
         <h1 className="text-3xl font-bold mb-8">
-          Bienvenue, {user?.first_name} {user?.last_name}
+          {user?.first_name} {user?.last_name}
         </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

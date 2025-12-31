@@ -97,6 +97,7 @@ export class SensorsService {
   async findOne(id: string, currentUser: User): Promise<Sensor> {
     const sensor = await this.sensorRepository.findOne({
       where: { id },
+      relations: ['space'],
     });
 
     if (!sensor) {

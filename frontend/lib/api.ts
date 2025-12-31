@@ -15,6 +15,10 @@ import {
   GetReadingsParams,
   GetReadingsResponse,
   SensorReading,
+  Space,
+  Building,
+  CreateSpaceRequest,
+  UpdateSpaceRequest,
 } from '@/types';
 
 // Auth API
@@ -30,8 +34,8 @@ export const authApi = {
   },
 
   getMe: async (): Promise<User> => {
-    const response = await apiClient.get<{ success: boolean; data: User }>('/auth/me');
-    return response.data.data; // Unwrap backend response
+    const response = await apiClient.get<User>('/auth/me');
+    return response.data; // /auth/me returns user directly, not wrapped
   },
 };
 
@@ -131,5 +135,50 @@ export const tenantsApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/tenants/${id}`);
+  },
+};
+
+// Spaces API
+export const spacesApi = {
+  getAll: async (): Promise<Space[]> => {
+    const response = await apiClient.get<Space[]>('/spaces');
+    return response.data;
+  },
+
+  getById: async (id: string): Promise<Space> => {
+    const response = await apiClient.get<Space>(`/spaces/${id}`);
+    return response.data;
+  },
+
+  getByTenant: async (tenantId: string, type?: string): Promise<Space[]> => {
+    const url = type
+      ? `/spaces/tenant/${tenantId}?type=${type}`
+      : `/spaces/tenant/${tenantId}`;
+    const response = await apiClient.get<Space[]>(url);
+    return response.data;
+  },
+
+  getBuildingsByTenant: async (tenantId: string): Promise<Building[]> => {
+    const response = await apiClient.get<Building[]>(`/spaces/tenant/${tenantId}/buildings`);
+    return response.data;
+  },
+
+  create: async (data: CreateSpaceRequest): Promise<Space> => {
+    const response = await apiClient.post<Space>('/spaces', data);
+    return response.data;
+  },
+
+  update: async (id: string, data: UpdateSpaceRequest): Promise<Space> => {
+    const response = await apiClient.put<Space>(`/spaces/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/spaces/${id}`);
+  },
+
+  getChildren: async (id: string): Promise<Space[]> => {
+    const response = await apiClient.get<Space[]>(`/spaces/${id}/children`);
+    return response.data;
   },
 };

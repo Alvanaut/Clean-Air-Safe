@@ -8,9 +8,13 @@ import { SensorsSyncController } from './sensors-sync.controller';
 import { SensorsReadingsController } from './sensors-readings.controller';
 import { SensorsService } from './sensors.service';
 import { SensorsController } from './sensors.controller';
+import { WebsocketModule } from '../../websocket/websocket.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Sensor, SensorReading, Tenant])],
+  imports: [
+    TypeOrmModule.forFeature([Sensor, SensorReading, Tenant]),
+    WebsocketModule,
+  ],
   controllers: [SensorsSyncController, SensorsController, SensorsReadingsController],
   providers: [KspSyncService, SensorsService],
   exports: [KspSyncService, SensorsService],
