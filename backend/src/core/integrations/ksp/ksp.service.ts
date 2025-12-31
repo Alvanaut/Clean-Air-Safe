@@ -31,7 +31,11 @@ export class KspService {
    * KSP timestamps are seconds since 2000-01-01 00:00:00
    */
   public kspTimestampToDate(kspTimestamp: number): Date {
-    return new Date(this.KSP_EPOCH + kspTimestamp * 1000);
+    // KSP timestamps are in Brussels time (CET/CEST = UTC+1)
+    // We need to convert to UTC by subtracting 1 hour
+    const brusselsTime = new Date(this.KSP_EPOCH + kspTimestamp * 1000);
+    const utcTime = new Date(brusselsTime.getTime() - 60 * 60 * 1000); // -1 hour
+    return utcTime;
   }
 
   /**
