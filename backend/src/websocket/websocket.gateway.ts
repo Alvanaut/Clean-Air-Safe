@@ -64,4 +64,53 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data,
     });
   }
+
+  /**
+   * Emit alert triggered event
+   */
+  emitAlertTriggered(alert: any) {
+    this.logger.log(`Emitting alert triggered: ${alert.id}`);
+    this.server.emit('alert:triggered', {
+      alertId: alert.id,
+      sensorId: alert.sensor_id,
+      tenantId: alert.tenant_id,
+      co2Level: alert.co2_level,
+      severity: alert.severity,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Emit alert escalated event
+   */
+  emitAlertEscalated(alert: any) {
+    this.logger.log(`Emitting alert escalated: ${alert.id} (level ${alert.escalation_level})`);
+    this.server.emit('alert:escalated', {
+      alertId: alert.id,
+      escalationLevel: alert.escalation_level,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Emit alert acknowledged event
+   */
+  emitAlertAcknowledged(alert: any) {
+    this.logger.log(`Emitting alert acknowledged: ${alert.id}`);
+    this.server.emit('alert:acknowledged', {
+      alertId: alert.id,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Emit alert resolved event
+   */
+  emitAlertResolved(alert: any) {
+    this.logger.log(`Emitting alert resolved: ${alert.id}`);
+    this.server.emit('alert:resolved', {
+      alertId: alert.id,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }

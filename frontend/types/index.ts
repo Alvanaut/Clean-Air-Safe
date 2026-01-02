@@ -156,7 +156,7 @@ export interface GetReadingsResponse {
 export type SpaceType = 'building' | 'floor' | 'room' | 'zone' | 'area';
 export type VentilationLevel = 'none' | 'natural' | 'mechanical' | 'hepa';
 export type CleaningFrequency = 'none' | 'weekly' | 'daily' | 'hourly';
-export type SafetyScore = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+export type SafetyScore = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 
 export interface Space {
   id: string;
@@ -203,16 +203,11 @@ export interface CreateSpaceRequest {
   metadata?: Record<string, any>;
   // CO2 Baseline
   co2_baseline?: number;
-  // Safety compliance
-  has_hydro_gel?: boolean;
-  has_temp_check?: boolean;
-  has_mask_required?: boolean;
-  ventilation_level?: VentilationLevel;
+  // Safety Score
+  safety_score?: SafetyScore;
+  // Optional fields for capacity
   max_capacity?: number;
   current_capacity?: number;
-  cleaning_frequency?: CleaningFrequency;
-  has_isolation_room?: boolean;
-  social_distancing?: boolean;
 }
 
 export interface UpdateSpaceRequest {
@@ -231,4 +226,53 @@ export interface UpdateSpaceRequest {
   cleaning_frequency?: CleaningFrequency;
   has_isolation_room?: boolean;
   social_distancing?: boolean;
+}
+
+// ==================== ALERTS ====================
+
+export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
+export type AlertSeverity = 'warning' | 'critical';
+
+export interface Alert {
+  id: string;
+  sensor_id: string;
+  sensor?: {
+    id: string;
+    name: string;
+    space?: {
+      id: string;
+      name: string;
+    };
+  };
+  tenant_id: string;
+  co2_level: number;
+  threshold_exceeded: number;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  escalation_level: number;
+  notified_users?: string[];
+  last_escalation_at?: string;
+  acknowledged_at?: string;
+  acknowledged_by_user_id?: string;
+  resolved_at?: string;
+  resolution_note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertStats {
+  active_count: number;
+  acknowledged_count: number;
+  resolved_count: number;
+  critical_count: number;
+}
+
+export interface GetAlertsParams {
+  status?: AlertStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ResolveAlertRequest {
+  resolution_note?: string;
 }

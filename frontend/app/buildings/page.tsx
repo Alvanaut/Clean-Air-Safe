@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { spacesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth-store';
@@ -12,11 +12,14 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import type { Space, CreateSpaceRequest } from '@/types';
+import { SAFETY_SCORES, getSafetyScoreDefinition } from '@/lib/safety-scores';
+import type { Space, CreateSpaceRequest, SafetyScore } from '@/types';
 
 export default function BuildingsPage() {
   const { user } = useAuthStore();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -30,23 +33,20 @@ export default function BuildingsPage() {
       city: '',
       postal_code: '',
     },
-    co2_baseline: 400,
-    has_hydro_gel: false,
-    has_temp_check: false,
-    has_mask_required: false,
-    ventilation_level: 'none',
-    max_capacity: undefined,
-    current_capacity: undefined,
-    cleaning_frequency: 'none',
-    has_isolation_room: false,
-    social_distancing: false,
   });
 
-  const { data: buildings, isLoading } = useQuery({
+  const { data: buildings, isLoading, refetch } = useQuery({
     queryKey: ['buildings', user?.tenantId],
     queryFn: () => spacesApi.getByTenant(user?.tenantId || '', 'building'),
     enabled: !!user?.tenantId,
   });
+
+  // Force refetch when component mounts to ensure fresh data
+  useEffect(() => {
+    if (user?.tenantId) {
+      refetch();
+    }
+  }, [user?.tenantId, refetch]);
 
   const createMutation = useMutation({
     mutationFn: spacesApi.create,
@@ -64,16 +64,6 @@ export default function BuildingsPage() {
           city: '',
           postal_code: '',
         },
-        co2_baseline: 400,
-        has_hydro_gel: false,
-        has_temp_check: false,
-        has_mask_required: false,
-        ventilation_level: 'none',
-        max_capacity: undefined,
-        current_capacity: undefined,
-        cleaning_frequency: 'none',
-        has_isolation_room: false,
-        social_distancing: false,
       });
     },
     onError: (error: Error) => {
@@ -174,6 +164,13 @@ export default function BuildingsPage() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => router.push(`/buildings/${building.id}`)}
+                    >
+                      Détails
+                    </Button>
                     {canManageBuildings && (
                       <Button
                         variant="danger"
@@ -247,98 +244,48 @@ export default function BuildingsPage() {
               />
             </div>
 
-            {/* CO2 Baseline */}
+
+            {/* Score de Sécurité */}
             <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Baseline CO2</h3>
-              <Input
-                label="Baseline CO2 (ppm)"
-                type="number"
-                value={formData.co2_baseline?.toString() || '400'}
-                onChange={(e) => setFormData({ ...formData, co2_baseline: parseInt(e.target.value) || 400 })}
-                placeholder="400"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Valeur de référence pour le CO2. Sera recalculée automatiquement chaque semaine après 7 jours de mesures.
-              </p>
-            </div>
-
-            {/* Mesures d'hygiène et sécurité */}
-            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Mesures d'hygiène et sécurité</h3>
-
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.has_hydro_gel}
-                  onChange={(e) => setFormData({ ...formData, has_hydro_gel: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Gel hydro-alcoolique disponible</span>
-              </label>
-
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.has_temp_check}
-                  onChange={(e) => setFormData({ ...formData, has_temp_check: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Contrôle de température</span>
-              </label>
-
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.has_mask_required}
-                  onChange={(e) => setFormData({ ...formData, has_mask_required: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Port du masque obligatoire</span>
-              </label>
-
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.has_isolation_room}
-                  onChange={(e) => setFormData({ ...formData, has_isolation_room: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Salle d'isolement disponible</span>
-              </label>
-
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.social_distancing}
-                  onChange={(e) => setFormData({ ...formData, social_distancing: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Distanciation sociale appliquée</span>
-              </label>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Score de Sécurité Sanitaire</h3>
 
               <Select
-                label="Niveau de ventilation"
-                value={formData.ventilation_level || 'none'}
-                onChange={(e) => setFormData({ ...formData, ventilation_level: e.target.value as any })}
+                label="Niveau de sécurité (optionnel)"
+                value={formData.safety_score || ''}
+                onChange={(e) => setFormData({ ...formData, safety_score: e.target.value ? e.target.value as SafetyScore : undefined })}
                 options={[
-                  { value: 'none', label: 'Aucune' },
-                  { value: 'natural', label: 'Naturelle' },
-                  { value: 'mechanical', label: 'Mécanique' },
-                  { value: 'hepa', label: 'HEPA (filtration haute efficacité)' },
+                  { value: '', label: 'Aucun (non applicable)' },
+                  ...Object.values(SAFETY_SCORES).map(score => ({
+                    value: score.score,
+                    label: score.label,
+                  }))
                 ]}
               />
 
-              <Select
-                label="Fréquence de nettoyage"
-                value={formData.cleaning_frequency || 'none'}
-                onChange={(e) => setFormData({ ...formData, cleaning_frequency: e.target.value as any })}
-                options={[
-                  { value: 'none', label: 'Aucun' },
-                  { value: 'weekly', label: 'Hebdomadaire' },
-                  { value: 'daily', label: 'Quotidien' },
-                  { value: 'hourly', label: 'Horaire' },
-                ]}
-              />
+              {formData.safety_score && (() => {
+                const scoreInfo = getSafetyScoreDefinition(formData.safety_score as SafetyScore);
+                return scoreInfo && (
+                  <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {scoreInfo.description}
+                    </p>
+                    {scoreInfo.criteria.length > 0 ? (
+                      <ul className="space-y-1">
+                        {scoreInfo.criteria.map((criterion, index) => (
+                          <li key={index} className="text-sm text-gray-600 dark:text-gray-400 flex items-start">
+                            <span className="mr-2">✓</span>
+                            <span>{criterion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        Aucune mesure sanitaire requise
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Capacité */}

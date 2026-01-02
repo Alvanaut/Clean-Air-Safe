@@ -10,9 +10,14 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { CO2Chart } from '@/components/sensors/CO2Chart';
 import { getCO2Status } from '@/lib/co2-thresholds';
+import { getSafetyScoreDefinition } from '@/lib/safety-scores';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 export default function SensorDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+
+  // Enable WebSocket for real-time updates
+  useWebSocket();
 
   const { data: sensor, isLoading } = useQuery({
     queryKey: ['sensor', params.id],
@@ -138,25 +143,40 @@ export default function SensorDetailPage({ params }: { params: { id: string } })
                       </dt>
                       <dd className="mt-1 font-medium">{sensor.space.co2_baseline} ppm</dd>
                     </div>
-                    {sensor.space.safety_score && (
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Score de Sécurité
-                        </dt>
-                        <dd className="mt-1">
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                            sensor.space.safety_score === 'A' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                            sensor.space.safety_score === 'B' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                            sensor.space.safety_score === 'C' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                            sensor.space.safety_score === 'D' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                            sensor.space.safety_score === 'E' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                            'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100'
-                          }`}>
-                            {sensor.space.safety_score}
-                          </span>
-                        </dd>
-                      </div>
-                    )}
+                    {sensor.space.safety_score && (() => {
+                      const scoreInfo = getSafetyScoreDefinition(sensor.space.safety_score);
+                      return scoreInfo && (
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                            Score de Sécurité
+                          </dt>
+                          <dd className="mt-1">
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${scoreInfo.color.bg} ${scoreInfo.color.text}`}>
+                              {scoreInfo.label}
+                            </span>
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Mesures sanitaires appliquées:
+                              </p>
+                              {scoreInfo.criteria.length > 0 ? (
+                                <ul className="space-y-1">
+                                  {scoreInfo.criteria.map((criterion, index) => (
+                                    <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+                                      <span className="mr-2 text-green-600">✓</span>
+                                      <span>{criterion}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                  Aucune mesure sanitaire requise
+                                </p>
+                              )}
+                            </div>
+                          </dd>
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </dl>

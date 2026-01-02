@@ -35,6 +35,21 @@ export default function UsersPage() {
     queryFn: usersApi.getAll,
   });
 
+  // Fetch tenants for GODMODE users
+  const { data: tenants } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: async () => {
+      const response = await fetch('/api/tenants', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const result = await response.json();
+      return result.data;
+    },
+    enabled: currentUser?.role === 'godmode',
+  });
+
   const createMutation = useMutation({
     mutationFn: usersApi.create,
     onSuccess: () => {
@@ -72,7 +87,22 @@ export default function UsersPage() {
       toast.error('Veuillez remplir tous les champs requis');
       return;
     }
-    createMutation.mutate(formData);
+
+    // Validation: non-GODMODE users must have a tenant_id
+    if (formData.role !== 'godmode' && !formData.tenant_id) {
+      toast.error('Veuillez sélectionner un tenant pour cet utilisateur');
+      return;
+    }
+
+    // For COMPANY_ADMIN, ensure tenant_id is set to their own tenant
+    const dataToSubmit = {
+      ...formData,
+      tenant_id: formData.role === 'godmode'
+        ? undefined
+        : (currentUser?.role === 'company_admin' ? currentUser.tenantId : formData.tenant_id),
+    };
+
+    createMutation.mutate(dataToSubmit);
   };
 
   const handleDelete = (id: string) => {
@@ -196,7 +226,15 @@ export default function UsersPage() {
             <Select
               label="Rôle"
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+              onChange={(e) => {
+                const newRole = e.target.value as any;
+                setFormData({
+                  ...formData,
+                  role: newRole,
+                  // Clear tenant_id if GODMODE role is selected
+                  tenant_id: newRole === 'godmode' ? '' : (currentUser?.tenantId || formData.tenant_id)
+                });
+              }}
               options={[
                 { value: 'user', label: 'Utilisateur' },
                 { value: 'manager', label: 'Manager' },
@@ -206,6 +244,33 @@ export default function UsersPage() {
                 ] : []),
               ]}
             />
+
+            {/* Tenant selector - only for GODMODE creating non-GODMODE users */}
+            {currentUser?.role === 'godmode' && formData.role !== 'godmode' && (
+              <Select
+                label="Tenant (Entreprise)"
+                value={formData.tenant_id || ''}
+                onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
+                options={[
+                  { value: '', label: '-- Sélectionner un tenant --' },
+                  ...(tenants || []).map((tenant: any) => ({
+                    value: tenant.id,
+                    label: tenant.name,
+                  })),
+                ]}
+                required
+              />
+            )}
+
+            {/* Show current tenant for COMPANY_ADMIN */}
+            {currentUser?.role === 'company_admin' && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  L'utilisateur sera créé dans votre entreprise
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 justify-end mt-6">
               <Button
                 variant="secondary"

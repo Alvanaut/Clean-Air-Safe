@@ -1,8 +1,8 @@
 # CleanAirSafe - État du Projet
 
-**Dernière mise à jour:** 31 Décembre 2024
+**Dernière mise à jour:** 31 Décembre 2025
 
-## 📊 Avancement Global: ~80%
+## 📊 Avancement Global: ~92%
 
 ### ✅ Fonctionnalités Implémentées
 
@@ -64,14 +64,27 @@ Baseline = 5ème percentile du CO2 sur 7 jours (espace vide)
 - [x] WebSocket pour mises à jour temps réel
 - [x] Fix timezone (Europe/Brussels)
 
-### 🔄 Phase 2 En Cours - Mises à Jour Temps Réel
+### ✅ Phase 2 Complétée - Mises à Jour Temps Réel
 
 **Objectif:** Valider le fonctionnement complet du WebSocket
 
-**À tester:**
-- [ ] Vérifier réception événements WebSocket dans console browser
-- [ ] Confirmer invalidation cache React Query automatique
-- [ ] Tester mise à jour graphique lors du prochain sync (toutes les 10min)
+**Tests effectués:**
+- [x] Vérifier réception événements WebSocket dans console browser
+- [x] Confirmer invalidation cache React Query automatique
+- [x] **Tester mise à jour graphique avec nouvelles données**
+
+**Résultats:**
+- ✅ WebSocket se connecte correctement au démarrage de l'application
+- ✅ Événements `sync:completed` émis et reçus après chaque synchronisation
+- ✅ Cache React Query invalidé automatiquement via WebSocket events
+- ✅ **Graphique mis à jour en temps réel sans rafraîchissement manuel**
+- ✅ Validation complète avec données test (777 ppm)
+
+**Bug résolu:**
+- **Problème:** Event listeners enregistrés avant connexion du socket
+- **Solution:** Listeners enregistrés dans l'événement `connect` du socket
+- **Fichier:** `frontend/hooks/useWebSocket.ts`
+- Les événements sont maintenant reçus et le cache est invalidé correctement
 
 ### ❌ Non Implémenté
 
@@ -196,10 +209,11 @@ SELECT id, name, type, tenant_id FROM spaces WHERE type = 'building';
 - [x] WebSocket temps réel
 - [x] Fix timezone
 
-### Phase 2 - Validation WebSocket (En cours)
-- [ ] Tests événements temps réel
-- [ ] Vérification invalidation cache
-- [ ] Optimisation performance
+### Phase 2 - Validation WebSocket ✅ COMPLÉTÉ
+- [x] Tests événements temps réel
+- [x] Vérification invalidation cache
+- [x] Fix bug timing socket connection
+- [x] Validation graphique temps réel
 
 ### Phase 3 - Alertes
 - [ ] Logique déclenchement alertes

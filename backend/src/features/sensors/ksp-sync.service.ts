@@ -36,6 +36,15 @@ export class KspSyncService {
   }
 
   /**
+   * Set AlertsService (injected after initialization to avoid circular dependency)
+   */
+  private alertsService: any;
+
+  setAlertsService(alertsService: any): void {
+    this.alertsService = alertsService;
+  }
+
+  /**
    * Cron job - Runs every 10 minutes
    * Format: second minute hour day month dayOfWeek
    */
@@ -303,6 +312,21 @@ export class KspSyncService {
             humidity: currentReading.humidity,
             timestamp: currentReading.timestamp,
           });
+
+          // Check if alert should be triggered or resolved
+          if (this.alertsService) {
+            const co2Level = Math.round(currentReading.co2);
+
+            // Check if alert should be triggered
+            await this.alertsService.checkAndTriggerAlert(
+              sensor.id,
+              co2Level,
+              sensor.tenant_id,
+            );
+
+            // Check if active alert should be auto-resolved
+            await this.alertsService.checkAndResolveAlert(sensor.id, co2Level);
+          }
         } else {
           this.logger.debug(
             `Reading already exists for sensor ${sensor.id} at ${currentReading.timestamp.toISOString()}`,

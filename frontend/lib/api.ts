@@ -19,6 +19,10 @@ import {
   Building,
   CreateSpaceRequest,
   UpdateSpaceRequest,
+  Alert,
+  AlertStats,
+  GetAlertsParams,
+  ResolveAlertRequest,
 } from '@/types';
 
 // Auth API
@@ -180,5 +184,35 @@ export const spacesApi = {
   getChildren: async (id: string): Promise<Space[]> => {
     const response = await apiClient.get<Space[]>(`/spaces/${id}/children`);
     return response.data;
+  },
+};
+
+// Alerts API
+export const alertsApi = {
+  getAll: async (params?: GetAlertsParams): Promise<Alert[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const response = await apiClient.get<{ success: boolean; data: Alert[]; count: number }>(
+      `/alerts${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    );
+    return response.data.data;
+  },
+
+  getById: async (id: string): Promise<Alert> => {
+    const response = await apiClient.get<{ success: boolean; data: Alert }>(`/alerts/${id}`);
+    return response.data.data;
+  },
+
+  // NOTE: Alerts are automatically resolved when CO2 returns below threshold.
+  // Manual acknowledge/resolve endpoints have been removed.
+
+  getStats: async (): Promise<AlertStats> => {
+    const response = await apiClient.get<{ success: boolean; data: AlertStats }>(
+      '/alerts/stats/summary'
+    );
+    return response.data.data;
   },
 };
